@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>함수 변환 시각화</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+
+    #plot {
+      width: 100%;
+      height: 600px;
+    }
+
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+
+    input {
+      width: 100px;
+    }
+  </style>
+</head>
+<body>
+  <h2>📊 함수 변환 시각화 도구</h2>
+
+  <label>함수 유형 선택:
+    <select id="funcType">
+      <option value="quadratic">이차함수 (ax² + bx + c)</option>
+      <option value="cubic">삼차함수 (ax³ + bx² + cx + d)</option>
+      <option value="trig">삼각함수 (a·sin(bx + c))</option>
+    </select>
+  </label>
+
+  <div id="paramContainer"></div>
+
+  <button onclick="draw()">그래프 그리기</button>
+  <div id="plot"></div>
+
+  <script>
+    const container = document.getElementById('paramContainer');
+    const typeSelect = document.getElementById('funcType');
+
+    typeSelect.addEventListener('change', updateInputs);
+    updateInputs(); // 초기 렌더링
+
+    function updateInputs() {
+      const type = typeSelect.value;
+      container.innerHTML = "";
+
+      const original = document.createElement('div');
+      const transform = document.createElement('div');
+
+      if (type === "quadratic") {
+        original.innerHTML = `
+          <h3>원함수 계수</h3>
+          aₚ: <input id="qa" value="1"> 
+          bₚ: <input id="qb" value="0"> 
+          cₚ: <input id="qc" value="0">
+        `;
+        transform.innerHTML = `
+          <h3>변환 계수</h3>
+          a: <input id="ta" value="1"> 
+          b: <input id="tb" value="0"> 
+          c: <input id="tc" value="0">
+        `;
+      } else if (type === "cubic") {
+        original.innerHTML = `
+          <h3>원함수 계수</h3>
+          aₚ: <input id="ca" value="1"> 
+          bₚ: <input id="cb" value="0"> 
+          cₚ: <input id="cc" value="0"> 
+          dₚ: <input id="cd" value="0">
+        `;
+        transform.innerHTML = `
+          <h3>변환 계수</h3>
+          a: <input id="ta" value="1"> 
+          b: <input id="tb" value="0"> 
+          c: <input id="tc" value="0"> 
+          d: <input id="td" value="0">
+        `;
+      } else if (type === "trig") {
+        original.innerHTML = `
+          <h3>원함수 계수</h3>
+          aₚ: <input id="sa" value="1"> 
+          bₚ: <input id="sb" value="1"> 
+          cₚ: <input id="sc" value="0">
+        `;
+        transform.innerHTML = `
+          <h3>변환 계수</h3>
+          a: <input id="ta" value="1"> 
+          b: <input id="tb" value="1"> 
+          c: <input id="tc" value="0">
+        `;
+      }
+
+      container.appendChild(original);
+      container.appendChild(transform);
+    }
+
+    function draw() {
+      const type = typeSelect.value;
+      const x = [];
+      for (let i = -10; i <= 10; i += 0.05) x.push(i);
+
+      let y1 = [], y2 = [], title = "", shapes = [];
+
+      if (type === "quadratic") {
+        const qa = parseFloat(document.getElementById('qa').value);
+        const qb = parseFloat(document.getElementById('qb').value);
+        const qc = parseFloat(document.getElementById('qc').value);
+        const ta = parseFloat(document.getElementById('ta').value);
+        const tb = parseFloat(document.getElementById('tb').value);
+        const tc = parseFloat(document.getElementById('tc').value);
+
+        y1 = x.map(val => qa * val ** 2 + qb * val + qc);
+        y2 = x.map(val => ta * val ** 2 + tb * val + tc);
+        title = "이차함수";
+
+      } else if (type === "cubic") {
+        const ca = parseFloat(document.getElementById('ca').value);
+        const cb = parseFloat(document.getElementById('cb').value);
+        const cc = parseFloat(document.getElementById('cc').value);
+        const cd = parseFloat(document.getElementById('cd').value);
+        const ta = parseFloat(document.getElementById('ta').value);
+        const tb = parseFloat(document.getElementById('tb').value);
+        const tc = parseFloat(document.getElementById('tc').value);
+        const td = parseFloat(document.getElementById('td').value);
+
+        y1 = x.map(val => ca * val ** 3 + cb * val ** 2 + cc * val + cd);
+        y2 = x.map(val => ta * val ** 3 + tb * val ** 2 + tc * val + td);
+        title = "삼차함수";
+
+      } else if (type === "trig") {
+        const sa = parseFloat(document.getElementById('sa').value);
+        const sb = parseFloat(document.getElementById('sb').value);
+        const sc = parseFloat(document.getElementById('sc').value);
+        const ta = parseFloat(document.getElementById('ta').value);
+        const tb = parseFloat(document.getElementById('tb').value);
+        const tc = parseFloat(document.getElementById('tc').value);
+
+        y1 = x.map(val => sa * Math.sin(sb * val + sc));
+        y2 = x.map(val => ta * Math.sin(tb * val + tc));
+        title = "삼각함수";
+
+        const base = 2 * Math.PI / Math.abs(tb || 1);
+        const quarter = base / 4;
+        for (let i = -10; i <= 10; i += quarter) {
+          shapes.push({
+            type: 'line',
+            x0: i, x1: i,
+            y0: -10, y1: 10,
+            line: {color: 'lightblue', dash: 'dot'}
+          });
+        }
+
+        // 탄젠트 점근선
+        if (document.getElementById('funcType').value === 'trig' && tb !== 0) {
+          const expr = math.compile(`${ta} * tan(${tb} * x + ${tc})`);
+          for (let i = -10; i <= 10; i += Math.PI / Math.abs(tb)) {
+            try {
+              const left = expr.evaluate({x: i - 0.01});
+              const right = expr.evaluate({x: i + 0.01});
+              if (Math.abs(left - right) > 10) {
+                shapes.push({
+                  type: 'line',
+                  x0: i, x1: i,
+                  y0: -10, y1: 10,
+                  line: {color: 'gray', dash: 'dash'}
+                });
+              }
+            } catch {}
+          }
+        }
+      }
+
+      const trace1 = {x, y: y1, mode: 'lines', name: '원함수'};
+      const trace2 = {x, y: y2, mode: 'lines', name: '변환함수'};
+
+      const layout = {
+        title: `${title} 변환 시각화`,
+        xaxis: {range: [-10, 10]},
+        yaxis: {range: [-10, 10]},
+        shapes
+      };
+
+      Plotly.newPlot('plot', [trace1, trace2], layout);
+    }
+  </script>
+</body>
+</html>
